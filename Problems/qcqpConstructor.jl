@@ -64,6 +64,28 @@ function quadFormConsGaugeSquareOracle(
     return ret
 end
 
+function quadFormConsHuberGaugeOracle(
+    x::Vector{Float64}, 
+    params::quadFormConsGaugeParams,
+    tol::Float64=10^(-7),
+    ret_grad::Bool=False
+    )
+    g = quadFormConsGaugeOracle(x, params, tol, ret_grad)
+    if g[1] > 1
+        ret = g
+    else
+        val = (g[1]^2 + 1) /2
+        if ret_grad
+            grad = g[1] * g[2]
+            ret = (val, grad)
+        else
+            ret = (val, )
+        end
+    end
+
+    return ret
+end
+
 function quadFormRadDualOracle(
         x::Vector{Float64}, 
         params::quadFormConsGaugeParams,
@@ -104,6 +126,7 @@ function quadFormPrimalOracle(x, P, q, r, ret_grad)
     return ret
 end
 
+# build radial QCQP
 struct radialQCQP <: problem_instance
     f::Function
     primal::Function
@@ -111,59 +134,27 @@ struct radialQCQP <: problem_instance
     identifiers::Vector{Function}
 end
 
-# build radial QCQP
-function constructRadialQCQPInstance(
+# function to construct problem instance
+function instanceConstructor(
     P0::Matrix{Float64}, 
     q0::Vector{Float64}, 
     r0::Float64, 
     rad_params::Vector{quadFormConsGaugeParams},
+    identifier_oracle::Function,
     tol::Float64=10^(-7)
-)
-# create the primal function
-primal = (x, ret_grad) -> quadFormPrimalOracle(x, P0, q0, r0, ret_grad)
-
-# dual objects
-m = size(rad_params)[1] - 1
-dual = Array{Function}(undef, m+1)
-identifiers = Array{Function}(undef, m)   
-obj_dual = (y, tau, ret_grad) -> quadFormRadDualOracle(y, rad_params[1], tau, tol, ret_grad)
-dual[1] = (y, tau, ret_grad) -> quadFormRadDualOracle(y, rad_params[1], tau, tol, ret_grad)
-for i=1:m
-    dual[i+1] = (y, tau, ret_grad) -> quadFormConsGaugeOracle(y, rad_params[i+1], tol, ret_grad)
-    identifiers[i] = (y, ret_grad) -> quadFormConsGaugeOracle(y, rad_params[i+1], tol, ret_grad)
-end
-f = (y, tau) -> eval_max(dual, y, tau)
-return radialQCQP(f, primal, obj_dual, identifiers)
-end
-
-### problem instance where the gauges are squared
-struct radialQCQP_sqGauges <: problem_instance
-    f::Function
-    primal::Function
-    objective_dual::Function
-    identifiers::Vector{Function}
-end
-
-function constructRadialQCQP_sqGaugesInstance(
-    P0::Matrix{Float64}, 
-    q0::Vector{Float64}, 
-    r0::Float64, 
-    rad_params::Vector{quadFormConsGaugeParams},
-    tol::Float64=10^(-7)
-)
-# create the primal function
-primal = (x, ret_grad) -> quadFormPrimalOracle(x, P0, q0, r0, ret_grad)
-
-# dual objects
-m = size(rad_params)[1] - 1
-dual = Array{Function}(undef, m+1)
-identifiers = Array{Function}(undef, m)   
-obj_dual = (y, tau, ret_grad) -> quadFormRadDualOracle(y, rad_params[1], tau, tol, ret_grad)
-dual[1] = (y, tau, ret_grad) -> quadFormRadDualOracle(y, rad_params[1], tau, tol, ret_grad)
-for i=1:m
-    dual[i+1] = (y, tau, ret_grad) -> quadFormConsGaugeSquareOracle(y, rad_params[i+1], tol, ret_grad)
-    identifiers[i] = (y, ret_grad) -> quadFormConsGaugeSquareOracle(y, rad_params[i+1], tol, ret_grad)
-end
-f = (y, tau) -> eval_max(dual, y, tau)
-return radialQCQP_sqGauges(f, primal, obj_dual, identifiers)
+    )
+    # create the primal function
+    primal = (x, ret_grad) -> quadFormPrimalOracle(x, P0, q0, r0, ret_grad)
+    # dual objects
+    m = size(rad_params)[1] - 1
+    dual = Array{Function}(undef, m+1)
+    identifiers = Array{Function}(undef, m)   
+    obj_dual = (y, tau, ret_grad) -> quadFormRadDualOracle(y, rad_params[1], tau, tol, ret_grad)
+    dual[1] = (y, tau, ret_grad) -> quadFormRadDualOracle(y, rad_params[1], tau, tol, ret_grad)
+    for i=1:m
+        dual[i+1] = (y, tau, ret_grad) -> identifier_oracle(y, rad_params[i+1], tol, ret_grad)
+        identifiers[i] = (y, ret_grad) -> identifier_oracle(y, rad_params[i+1], tol, ret_grad)
+    end
+    f = (y, tau) -> eval_max(dual, y, tau)
+    return radialQCQP(f, primal, obj_dual, identifiers)
 end

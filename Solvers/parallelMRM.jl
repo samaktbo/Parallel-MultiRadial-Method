@@ -24,7 +24,7 @@ function parallelMRMRestart(
     if (1 + rho_tilde * delta) * best_st.tau < tau
         new_state = fom.initialize(copy(best_st.iterate), delta, st.instance)
         # keep old smoothness constant for smooth methods
-        if fom == fastSmoothingMethod || fom == fastGenGradMethod || fom == acFastSmoothingMethod
+        if fom == fastSmoothingMethod || fom == fastGenGradMethod
             new_state.L = st.L
         end
         to_ret = (new_state, copy(best_st.tau))

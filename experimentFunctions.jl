@@ -25,8 +25,8 @@ function makeQCQP(Ps, qs, rs, centers, m, n, tol)
     for j=1:m+1
         rad_params[j] = quadFormConsGaugeParamsInitializer(Ps[j], qs[j], rs[j], centers[j])
     end
-    qcqp = constructRadialQCQPInstance(Ps[1], qs[1],rs[1], rad_params)
-    return qcqp
+    inst = instanceConstructor(Ps[1], qs[1],rs[1], rad_params, quadFormConsGaugeOracle, tol)
+    return inst
 end
 
 function makeQCQP_sqGauges(Ps, qs, rs, centers, m, n, tol)
@@ -34,9 +34,18 @@ function makeQCQP_sqGauges(Ps, qs, rs, centers, m, n, tol)
     for j=1:m+1
         rad_params[j] = quadFormConsGaugeParamsInitializer(Ps[j], qs[j], rs[j], centers[j])
     end
-    inst = constructRadialQCQP_sqGaugesInstance(Ps[1], qs[1],rs[1], rad_params)
+    inst = instanceConstructor(Ps[1], qs[1],rs[1], rad_params, quadFormConsGaugeSquareOracle, tol)
     return inst
-end;
+end
+
+function makeQCQP_HuberGauges(Ps, qs, rs, centers, m, n, tol)
+    rad_params = Vector{quadFormConsGaugeParams}(undef, m+1)
+    for j=1:m+1
+        rad_params[j] = quadFormConsGaugeParamsInitializer(Ps[j], qs[j], rs[j], centers[j])
+    end
+    inst = instanceConstructor(Ps[1], qs[1],rs[1], rad_params, quadFormConsHuberGaugeOracle, tol)
+    return inst
+end
 
 function getSamplingParameters(Ps, qs, rs, best_centers)
     mp1 = size(Ps)[1]
